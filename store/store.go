@@ -17,13 +17,13 @@ var (
 
 func (ts *TaskStore) Add(t *entity.Task) (entity.TaskID, error) {
 	ts.LastID++
-	t.ID = ts.LastID
-	ts.Tasks[t.ID] = t
-	return t.ID, nil
+	t.IDX = ts.LastID
+	ts.Tasks[t.IDX] = t
+	return t.IDX, nil
 }
 
 func (ts *TaskStore) Get(t *entity.Task) (*entity.Task, error) {
-	if t, ok := ts.Tasks[t.ID]; ok {
+	if t, ok := ts.Tasks[t.IDX]; ok {
 		return t, nil
 	}
 	return nil, ErrNotFound
