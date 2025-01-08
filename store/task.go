@@ -3,6 +3,8 @@ package store
 import (
 	"context"
 	"fmt"
+	"strconv"
+
 	//"github.com/godror/godror"
 	_ "github.com/godror/godror"
 	"github.com/upbreak/go-todo-app/entity"
@@ -28,6 +30,29 @@ func (r *Repository) ListTasks(ctx context.Context, db Queryer) (entity.Tasks, e
 		return nil, err
 	}
 	return tasks, nil
+}
+
+func (r *Repository) DetailTask(ctx context.Context, db Queryer, idx string) (entity.Task, error) {
+	task := entity.Task{}
+	sql := `SELECT
+				t1.IDX,
+				t1.TITLE,
+				t1.CONTENT,
+				t1.REG_DATE
+			FROM
+				IRIS_NOTICE_BOARD t1
+			WHERE
+				t1.IS_USE = 'Y'
+			AND t1.IDX = :1`
+
+	idxValue, err := strconv.Atoi(idx)
+	if err != nil {
+		return task, err
+	}
+	if err := db.GetContext(ctx, &task, sql, idxValue); err != nil {
+		return task, err
+	}
+	return task, nil
 }
 
 func (r *Repository) AddTask(ctx context.Context, db Beginner, t *entity.Task) error {

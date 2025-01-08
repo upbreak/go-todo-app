@@ -33,5 +33,8 @@ func NewMux(ctx context.Context, cfg *config.DBConfig) (http.Handler, func(), er
 	lt := &handler.ListTask{Service: &service.ListTask{DB: db, Repo: &r}}
 	mux.Get("/tasks", lt.ServeHTTP)
 
+	dt := &handler.DetailTask{Service: &service.DetailTask{DB: db, Repo: &r}}
+	mux.Get("/tasks/{idx}", dt.ServeHTTP)
+
 	return mux, cleanup, nil
 }
