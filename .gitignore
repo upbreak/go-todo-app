@@ -117,4 +117,12 @@ fabric.properties
 # End of https://www.toptal.com/developers/gitignore/api/intellij
 
 .idea/*
-github.com/upbreak/github.com/upbreak/*
+github.com/*
+.idea/modules.xml
+.idea/vcs.xml
+github.com/upbreak/github.com/upbreak/go-todo-app.iml
+go-todo-app.iml
+
+# db접속 정보
+config/dbConfig.go
+
