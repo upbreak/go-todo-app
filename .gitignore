@@ -124,5 +124,5 @@ github.com/upbreak/github.com/upbreak/go-todo-app.iml
 go-todo-app.iml
 
 # db접속 정보
-config/dbConfig.go
+config/db*.go
 
