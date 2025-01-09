@@ -28,7 +28,7 @@ func run(ctx context.Context) error {
 	url := fmt.Sprintf("http://%s", l.Addr().String())
 	log.Printf("start with: %v", url)
 
-	dbCfg, err := config.DBNew()
+	dbCfg, err := config.DBSafeNew()
 	if err != nil {
 		return err
 	}
