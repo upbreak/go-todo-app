@@ -4,6 +4,7 @@ import (
 	"context"
 	"github.com/go-chi/chi/v5"
 	"github.com/go-playground/validator"
+	"github.com/rs/cors"
 	"github.com/upbreak/go-todo-app/auth"
 	"github.com/upbreak/go-todo-app/clock"
 	"github.com/upbreak/go-todo-app/config"
@@ -20,6 +21,14 @@ func NewMux(ctx context.Context, cfg *config.DBConfigs) (http.Handler, []func(),
 	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		_, _ = w.Write([]byte(`{"status": "ok"}`))
+	})
+
+	// CORS 미들웨어 설정
+	c := cors.New(cors.Options{
+		AllowedOrigins:   []string{"http://example.com", "http://localhost:3000"}, // 허용할 도메인
+		AllowCredentials: true,                                                    // 쿠키 허용
+		AllowedMethods:   []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"},     // 허용할 메서드
+		AllowedHeaders:   []string{"Content-Type", "Authorization"},               // 허용할 헤더
 	})
 
 	// db연결 설정
@@ -66,5 +75,7 @@ func NewMux(ctx context.Context, cfg *config.DBConfigs) (http.Handler, []func(),
 		r.Get("/{idx}", dt.ServeHTTP)
 	})
 
-	return mux, cleanup, nil
+	handlerMux := c.Handler(mux)
+
+	return handlerMux, cleanup, nil
 }
