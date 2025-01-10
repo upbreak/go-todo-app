@@ -16,3 +16,7 @@ type DetailTaskStore interface {
 type AddTaskStore interface {
 	AddTask(ctx context.Context, db Beginner, t *entity.Task) error
 }
+
+type GetUserValidStore interface {
+	GetUserValid(ctx context.Context, db Queryer, id string, pwMd5 string) (entity.User, error)
+}

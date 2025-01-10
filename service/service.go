@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+	"github.com/upbreak/go-todo-app/auth"
 	"github.com/upbreak/go-todo-app/entity"
 )
 
@@ -15,4 +16,8 @@ type DetailTaskService interface {
 
 type AddTasksService interface {
 	AddTask(ctx context.Context, t *entity.Task) error
+}
+
+type GetUserValidService interface {
+	GetUserValid(ctx context.Context, id string, pw string) (auth.JWTClaims, error)
 }
