@@ -24,7 +24,11 @@ func New(ctx context.Context, cfg *config.DBConfig) (*sqlx.DB, func(), error) {
 	}
 
 	xdb := sqlx.NewDb(db, "godror")
-	return xdb, func() { _ = db.Close() }, err
+	cleanup := func() {
+		fmt.Println("close db: %s", cfg.DBName)
+		_ = db.Close()
+	}
+	return xdb, cleanup, err
 }
 
 type Repository struct {
