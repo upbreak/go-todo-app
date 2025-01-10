@@ -123,6 +123,5 @@ github.com/*
 github.com/upbreak/github.com/upbreak/go-todo-app.iml
 go-todo-app.iml
 
-# db접속 정보
 config/db*.go
-
+config/jwtConfig.go
