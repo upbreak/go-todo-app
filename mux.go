@@ -25,13 +25,13 @@ func NewMux(ctx context.Context, cfg *config.DBConfigs) (http.Handler, []func(),
 	// db연결 설정
 	var cleanup []func()
 	safeDb, safeCleanup, err := store.New(ctx, cfg.Safe)
+	cleanup = append(cleanup, func() { safeCleanup() })
 	if err != nil {
-		cleanup = append(cleanup, func() { safeCleanup() })
 		return nil, cleanup, err
 	}
 	_, hterpCleanup, err := store.New(ctx, cfg.Safe)
+	cleanup = append(cleanup, func() { hterpCleanup() })
 	if err != nil {
-		cleanup = append(cleanup, func() { hterpCleanup() })
 		return nil, cleanup, err
 	}
 
@@ -55,13 +55,16 @@ func NewMux(ctx context.Context, cfg *config.DBConfigs) (http.Handler, []func(),
 	mux.Post("/login", loginHandler.ServeHTTP)
 
 	at := &handler.AddTask{Service: &service.AddTask{DB: safeDb, Repo: &r}, Validator: v}
-	mux.Post("/tasks", at.ServeHTTP)
-
 	lt := &handler.ListTask{Service: &service.ListTask{DB: safeDb, Repo: &r}}
-	mux.Get("/tasks", lt.ServeHTTP)
-
 	dt := &handler.DetailTask{Service: &service.DetailTask{DB: safeDb, Repo: &r}}
-	mux.Get("/tasks/{idx}", dt.ServeHTTP)
+
+	// 미들웨어를 사용하여 토큰 검사 후 ServeHTTP 실행
+	mux.Route("/tasks", func(r chi.Router) {
+		r.Use(handler.AuthMiddleware(jwt))
+		r.Post("/", at.ServeHTTP)
+		r.Get("/", lt.ServeHTTP)
+		r.Get("/{idx}", dt.ServeHTTP)
+	})
 
 	return mux, cleanup, nil
 }

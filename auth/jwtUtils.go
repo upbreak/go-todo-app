@@ -1,6 +1,7 @@
 package auth
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"github.com/golang-jwt/jwt/v5"
@@ -30,6 +31,10 @@ type JWTClaims struct {
 	Token  string
 }
 
+// context에 저장하는 claims value
+type UserId struct{}
+type Role struct{}
+
 // JWTUtils 구조체 생성
 func JwtNew(c clock.Clocker) (*JWTUtils, error) {
 	jwt := &JWTUtils{}
@@ -46,14 +51,15 @@ func JwtNew(c clock.Clocker) (*JWTUtils, error) {
 }
 
 // 토큰 생성
-func (j *JWTUtils) GenerateToken(userId string) (string, error) {
+func (j *JWTUtils) GenerateToken(jwtClaims *JWTClaims) (*JWTClaims, error) {
 	// 비밀 키
-	secretKey := j.Cfg.SecretKey
+	secretKey := []byte(j.Cfg.SecretKey)
+	//fmt.Printf("GenerateToken secretkey: %v \n", secretKey)
 
 	// JWT 클레임 설정
 	claims := jwt.MapClaims{
-		"userId": userId,
-		"exp":    j.Clock.Now().Add(10 * time.Microsecond), // 만료 시간: 1시간
+		"userId": jwtClaims.UserId,
+		"exp":    j.Clock.Now().Add(1 * time.Minute).Unix(), // 만료 시간: 1분
 		"role":   "admin",
 	}
 
@@ -61,16 +67,23 @@ func (j *JWTUtils) GenerateToken(userId string) (string, error) {
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
 
 	// 비밀 키로 서명
-	tokenString, err := token.SignedString([]byte(secretKey))
+	tokenString, err := token.SignedString(secretKey)
 	if err != nil {
-		return "", fmt.Errorf("jwtUtils.go/GenerateToken() err: %w", err)
+		return &JWTClaims{}, fmt.Errorf("jwtUtils.go/GenerateToken() err: %w", err)
 	}
+	//fmt.Println(tokenString)
 
-	return tokenString, nil
+	jwtClaims.Token = tokenString
+
+	return jwtClaims, nil
 }
 
 // 토큰 유효성 검사
 func (j *JWTUtils) validateJWT(r *http.Request) (*JWTClaims, error) {
+	// 비밀 키
+	secretKey := []byte(j.Cfg.SecretKey)
+	//fmt.Printf("validateJWT secretkey: %v \n", secretKey)
+
 	// Authorization 헤더 읽기
 	authHeader := r.Header.Get("Authorization")
 	if authHeader == "" {
@@ -82,9 +95,7 @@ func (j *JWTUtils) validateJWT(r *http.Request) (*JWTClaims, error) {
 	if tokenString == authHeader {
 		return nil, errors.New("Invalid Authorization token format")
 	}
-
-	// 비밀 키
-	secretKey := j.Cfg.SecretKey
+	//fmt.Println(tokenString)
 
 	// 토큰 파싱 및 검증
 	token, err := jwt.Parse(tokenString, func(token *jwt.Token) (interface{}, error) {
@@ -95,7 +106,7 @@ func (j *JWTUtils) validateJWT(r *http.Request) (*JWTClaims, error) {
 		return secretKey, nil
 	})
 	if err != nil {
-		return nil, fmt.Errorf("invalid token: %v", err)
+		return nil, fmt.Errorf("jwtUtile.go/invalid token: %v", err)
 	}
 
 	// 클레임 확인
@@ -109,4 +120,30 @@ func (j *JWTUtils) validateJWT(r *http.Request) (*JWTClaims, error) {
 	}
 
 	return jwtClaims, nil
+}
+
+// 사용자 토큰 인증시 필요한 api 호출시 token의 claims에 있는 값을 context에 저장
+func (j *JWTUtils) FillContext(r *http.Request) (*http.Request, error) {
+	// 토큰 검사 및 claims 추출
+	claims, err := j.validateJWT(r)
+	if err != nil {
+		return nil, err
+	}
+
+	// claims 데이터 context에 저장
+	ctx := SetContext(r.Context(), UserId{}, claims.UserId)
+	ctx = SetContext(ctx, Role{}, string(claims.Role))
+
+	httpRequestClone := r.Clone(ctx)
+
+	return httpRequestClone, nil
+}
+
+func SetContext(ctx context.Context, key struct{}, value string) context.Context {
+	return context.WithValue(ctx, key, value)
+}
+
+func GetContext(ctx context.Context, key interface{}) (string, bool) {
+	value, ok := ctx.Value(key).(string)
+	return value, ok
 }
