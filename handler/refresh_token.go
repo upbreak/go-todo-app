@@ -2,23 +2,22 @@ package handler
 
 import (
 	"encoding/json"
-	"github.com/upbreak/go-todo-app/service"
+	"github.com/upbreak/go-todo-app/auth"
 	"net/http"
 )
 
-type GetUser struct {
-	Service service.GetUser
+type RefreshToken struct {
+	Jwt *auth.JWTUtils
 }
 
-func (g *GetUser) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+func (rt *RefreshToken) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 
-	var login struct {
-		UserId string `json:"userId"`
-		Pw     string `json:"pw"`
+	var token struct {
+		RefreshToken string `json:"refreshToken"`
 	}
 
-	if err := json.NewDecoder(r.Body).Decode(&login); err != nil {
+	if err := json.NewDecoder(r.Body).Decode(&token); err != nil {
 		RespondJSON(
 			ctx,
 			w,
@@ -29,7 +28,7 @@ func (g *GetUser) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	jwtClaims, err := g.Service.GetUserValid(ctx, login.UserId, login.Pw)
+	jwtClaims, err := rt.Jwt.RefreshToken(token.RefreshToken)
 	if err != nil {
 		RespondJSON(
 			ctx,

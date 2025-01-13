@@ -26,9 +26,10 @@ const (
 
 // claims 정의
 type JWTClaims struct {
-	UserId string
-	Role   JWTRole
-	Token  string
+	UserId       string
+	Role         JWTRole
+	Token        string
+	RefreshToken string
 }
 
 // context에 저장하는 claims value
@@ -54,6 +55,7 @@ func JwtNew(c clock.Clocker) (*JWTUtils, error) {
 func (j *JWTUtils) GenerateToken(jwtClaims *JWTClaims) (*JWTClaims, error) {
 	// 비밀 키
 	secretKey := []byte(j.Cfg.SecretKey)
+	RefreshKey := j.Cfg.RefreshKey
 	//fmt.Printf("GenerateToken secretkey: %v \n", secretKey)
 
 	// JWT 클레임 설정
@@ -62,20 +64,84 @@ func (j *JWTUtils) GenerateToken(jwtClaims *JWTClaims) (*JWTClaims, error) {
 		"exp":    j.Clock.Now().Add(1 * time.Minute).Unix(), // 만료 시간: 1분
 		"role":   "admin",
 	}
+	refreshClaims := jwt.MapClaims{
+		"userId":     jwtClaims.UserId,
+		"role":       "admin",
+		"exp":        j.Clock.Now().Add(5 * time.Minute).Unix(), // 만료 시간: 5분
+		"refreshKey": RefreshKey,
+	}
 
 	// 토큰 생성
-	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
+	parseToken := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
+	refreshToken := jwt.NewWithClaims(jwt.SigningMethodHS256, refreshClaims)
+
+	// 비밀 키로 서명
+	tokenString, err := parseToken.SignedString(secretKey)
+	if err != nil {
+		return &JWTClaims{}, fmt.Errorf("jwtUtils.go/GenerateToken() err: %w", err)
+	}
+	refreshTokenString, err := refreshToken.SignedString(secretKey)
+	if err != nil {
+		return &JWTClaims{}, fmt.Errorf("jwtUtils.go/GenerateRefreshToken() err: %w", err)
+	}
+
+	jwtClaims.Token = tokenString
+	jwtClaims.RefreshToken = refreshTokenString
+
+	return jwtClaims, nil
+}
+
+// 토큰 재발급
+func (j *JWTUtils) RefreshToken(refreshToken string) (*JWTClaims, error) {
+	// 비밀 키
+	secretKey := []byte(j.Cfg.SecretKey)
+	RefreshKey := j.Cfg.RefreshKey
+
+	// 토큰 파싱 및 검증
+	parseToken, err := jwt.Parse(refreshToken, func(token *jwt.Token) (interface{}, error) {
+		// 서명 방법 확인
+		if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
+			return nil, fmt.Errorf("unexpected signing method: %v", token.Header["alg"])
+		}
+		return secretKey, nil
+	})
+	if err != nil {
+		return nil, fmt.Errorf("jwtUtile.go/RefreshToken-invalid refreshToken: %v", err)
+	}
+
+	// 클레임 RefreshKey 확인
+	claims, ok := parseToken.Claims.(jwt.MapClaims)
+	if claims["refreshKey"] != RefreshKey {
+		return nil, fmt.Errorf("jwtUtile.go/RefreshToken-refreshToken is differ: %v", err)
+	}
+	if !ok || !parseToken.Valid {
+		return nil, fmt.Errorf("jwtUtile.go/RefreshToken-invalid token")
+	}
+
+	// JWT 클레임 설정
+	jwtClaims := jwt.MapClaims{
+		"userId": claims["userId"].(string),
+		"exp":    j.Clock.Now().Add(1 * time.Minute).Unix(), // 만료 시간: 1분
+		"role":   claims["role"].(string),
+	}
+
+	// 토큰 생성
+	token := jwt.NewWithClaims(jwt.SigningMethodHS256, jwtClaims)
 
 	// 비밀 키로 서명
 	tokenString, err := token.SignedString(secretKey)
 	if err != nil {
 		return &JWTClaims{}, fmt.Errorf("jwtUtils.go/GenerateToken() err: %w", err)
 	}
-	//fmt.Println(tokenString)
 
-	jwtClaims.Token = tokenString
+	jwtTokenClaims := &JWTClaims{
+		UserId:       claims["userId"].(string),
+		Role:         JWTRole(claims["role"].(string)),
+		Token:        tokenString,
+		RefreshToken: refreshToken,
+	}
 
-	return jwtClaims, nil
+	return jwtTokenClaims, nil
 }
 
 // 토큰 유효성 검사
@@ -98,7 +164,7 @@ func (j *JWTUtils) validateJWT(r *http.Request) (*JWTClaims, error) {
 	//fmt.Println(tokenString)
 
 	// 토큰 파싱 및 검증
-	token, err := jwt.Parse(tokenString, func(token *jwt.Token) (interface{}, error) {
+	parseToken, err := jwt.Parse(tokenString, func(token *jwt.Token) (interface{}, error) {
 		// 서명 방법 확인
 		if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
 			return nil, fmt.Errorf("unexpected signing method: %v", token.Header["alg"])
@@ -110,8 +176,8 @@ func (j *JWTUtils) validateJWT(r *http.Request) (*JWTClaims, error) {
 	}
 
 	// 클레임 확인
-	claims, ok := token.Claims.(jwt.MapClaims)
-	if !ok || !token.Valid {
+	claims, ok := parseToken.Claims.(jwt.MapClaims)
+	if !ok || !parseToken.Valid {
 		return nil, fmt.Errorf("invalid token")
 	}
 	jwtClaims := &JWTClaims{

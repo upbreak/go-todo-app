@@ -54,6 +54,7 @@ func NewMux(ctx context.Context, cfg *config.DBConfigs) (http.Handler, []func(),
 	v := validator.New()
 
 	// 라우팅
+	// 로그인
 	loginHandler := &handler.GetUser{
 		Service: service.GetUser{
 			DB:   safeDb,
@@ -63,6 +64,11 @@ func NewMux(ctx context.Context, cfg *config.DBConfigs) (http.Handler, []func(),
 	}
 	mux.Post("/login", loginHandler.ServeHTTP)
 
+	// 토큰 재발급
+	refreshTokenHandler := &handler.RefreshToken{Jwt: jwt}
+	mux.Post("/refresh-token", refreshTokenHandler.ServeHTTP)
+
+	// task crud
 	at := &handler.AddTask{Service: &service.AddTask{DB: safeDb, Repo: &r}, Validator: v}
 	lt := &handler.ListTask{Service: &service.ListTask{DB: safeDb, Repo: &r}}
 	dt := &handler.DetailTask{Service: &service.DetailTask{DB: safeDb, Repo: &r}}
