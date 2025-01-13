@@ -16,10 +16,9 @@ type GetUser struct {
 }
 
 func (g *GetUser) GetUserValid(ctx context.Context, id string, pw string) (*auth.JWTClaims, error) {
+	// 비밀번호 암호화. postman을 이용한 테스트 때문에 여기서 암호화 함.
 	hash := md5.Sum([]byte(pw))
-	//fmt.Printf("hash: %v \n", hash)
 	pwMd5 := hex.EncodeToString(hash[:])
-	//fmt.Printf("pwMd5: %v \n", pwMd5)
 
 	// 유저 확인
 	user, err := g.Repo.GetUserValid(ctx, g.DB, id, pwMd5)
@@ -39,5 +38,4 @@ func (g *GetUser) GetUserValid(ctx context.Context, id string, pw string) (*auth
 	}
 
 	return jwtClaims, nil
-
 }
